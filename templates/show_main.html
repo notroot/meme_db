@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+
+
+{% block main %}
+
+<!-- Page Content -->
+<div class="container">
+
+    <div class="row">
+
+        <div class="col-lg-12">
+            <h1 class="page-header">Meme Gallery</h1>
+        </div>
+
+      </div>
+
+      {% for group in thumbs|batch(4) -%}
+      <div class="row">
+        {% for thumb in group  -%}
+          <div class="col-lg-3 col-md-4 col-xs-6 thumb">
+            <h4>{{ thumb.title }} </h4>
+            <a class="thumbnail" href="/{{thumb.imgid }}">
+            <img class="img-responsive" src="/static/{{ thumb.path_thumb }}" alt="">
+            </a>
+          </div>
+        {%- endfor %}
+      </div>
+      {%- endfor %}
+
+
+      <div class="row text-center">
+        <ul class="pagination">
+          {% if p != 1 %}
+          <li>
+            <a href="/?p={{ p - 1 }}" aria-label="Previous">
+            <span aria-hidden="true">&laquo;</span>
+            </a>
+          </li>
+          {% endif %}
+          {% for i in range(1,page_count+1) -%}
+            {% if i == p -%}
+              <li class="active"><a href="/?p={{ i }}">{{ i }}</a></li>
+            {% else %}
+              <li><a href="/?p={{ i }}">{{ i }}</a></li>
+            {%- endif %}
+
+          {%- endfor %}
+          <li>
+            <a href="/?p={{ p + 1 }}" aria-label="Next">
+            <span aria-hidden="true">&raquo;</span>
+            </a>
+          </li>
+        </ul>
+
+
+
+      </div>
+
+<!-- Footer -->
+<footer>
+    <div class="row">
+        <div class="col-lg-12">
+            <p>Copyright &copy; Your Website 2014</p>
+        </div>
+    </div>
+</footer>
+
+</div>
+<!-- /.container -->
+
+{% endblock main %}
