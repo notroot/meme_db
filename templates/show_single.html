@@ -14,7 +14,26 @@
 
   <div class="row">
     <div class="col-lg-12">
-      <img src="/static/{{image.path}}">
+      <img src="/static/{{image.path}}" />
+    </div>
+  </div>
+
+  <div class="row vspace">
+    <div class="col-lg-12">
+      {% if back != None -%}
+      <a href="{{back}}" class="btn btn-default" role="button">
+        <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span> Back
+      </a>
+      {% else %}
+      <a href="/" class="btn btn-default" role="button">
+        <span class="glyphicon glyphicon-home" aria-hidden="true"></span> Home
+      </a>
+      {%- endif %}
+      <a href="#" class="btn btn-default" role="button">
+        <span class="glyphicon glyphicon-random" aria-hidden="true"></span> Generate
+      </a>
+
+
     </div>
   </div>
 

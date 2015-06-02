@@ -10,6 +10,7 @@ app = Flask(__name__)
 app.config.update(dict(
     DEBUG=True,
 	DATABASE=os.path.join(app.root_path, 'meme.db'),
+	SECRET_KEY='testkey',
 ))
 
 # DB logic for setting up database connection and teardown
@@ -77,13 +78,16 @@ def getObfuscate(key):
 @app.route('/')
 def hello_world():
 
+    if request.args.get("i"):
+        return redirect("/%s" % request.args["i"])
+
     if request.args.get("p"):
         p = int(request.args['p'])
         if p > 1:
             offset = (p -1) * 20
         else:
             offset = 0
-            
+
         thumbs= getImageThumbs(20, offset)
     else:
         p=1
@@ -94,13 +98,21 @@ def hello_world():
 @app.route('/<var>')
 def parse_ask(var=None):
 
+    back=request.referrer
+
     if var.isdigit():
         img = getImageByID(var)
-        return render_template('show_single.html', image=img)
+        if img:
+            return render_template('show_single.html', image=img, back=back)
+        else:
+            flash('Image not found, dumping you back home')
+            return redirect(request.url_root)
     else:
         img = getObfuscate(var)
-        return render_template('show_ob.html', image=img)
-
+        if img:
+            return render_template('show_ob.html', image=img)
+        else:
+            return render_template('show_error.html', error_message="Obfuscation not found")
 
 app.wsgi_app = ProxyFix(app.wsgi_app)
 if __name__ == '__main__':
