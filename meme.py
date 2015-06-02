@@ -1,5 +1,6 @@
 from flask import Flask, request, session, g, redirect, url_for, \
      abort, render_template, flash, jsonify, json
+from flask.ext.login import LoginManager, UserMixin, login_required, login_user
 from werkzeug.contrib.fixers import ProxyFix
 import sqlite3
 import os
@@ -14,6 +15,10 @@ app.config.update(dict(
 	DATABASE=os.path.join(app.root_path, 'meme.db'),
 	SECRET_KEY='testkey',
 ))
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "/login"
 
 # DB logic for setting up database connection and teardown
 def connectDB():
@@ -31,6 +36,63 @@ def closeDB(error):
 	if hasattr(g, 'sqlite_db'):
 		g.sqlite_db.close()
 
+
+class User(object):
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+        db = getDB()
+        cur = db.execute("SELECT short_name, email, date_created, last_login, admin FROM users WHERE user_id=?", (user_id,))
+        row = cur.fetchone()
+
+        self.short_name = row['short_name']
+        self.email = row['email']
+        self.date_created = row['date_created']
+        self.last_login = row['last_login']
+        self.admin = row['admin']
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.user_id
+
+@login_manager.user_loader
+def load_user(user_id):
+    return getUserByID(user_id)
+
+
+def getUserID(email):
+    db = getDB()
+
+    cur = db.execute("SELECT user_id FROM users WHERE email=?", (email,))
+    row = cur.fetchone()
+    cur.close()
+
+    user_id = None
+
+    if row:
+        return row['user_id']
+    else:
+        return None
+
+def getUserByID(user_id):
+    db = getDB()
+
+    cur = db.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+
+    if row:
+        return User(row['user_id'])
+    else:
+        return None
 
 def getPageCount():
     db = getDB()
@@ -111,6 +173,7 @@ def generatetObURL(img_id):
 # Route handing logic
 ###############################################################################
 @app.route('/')
+@login_required
 def hello_world():
 
     if request.args.get("i"):
@@ -150,6 +213,7 @@ def parse_ask(var):
             return render_template('show_error.html', error_message="Obfuscation not found")
 
 @app.route('/gen/<img_id>')
+@login_required
 def parseGen(img_id):
 
     img = getImageByID(img_id)
@@ -159,6 +223,33 @@ def parseGen(img_id):
         return redirect(new_ob_url)
     else:
         return render_template('show_error.html', error_message="Can't do that sir")
+
+@app.route('/login', methods=['GET', 'POST'])
+def show_login():
+    if request.method == 'POST':
+        email = None
+
+        form = request.form
+        if form.get('email'):
+            email = form.get('email')
+        if form.get('password'):
+            password = form.get('password')
+
+        if email:
+            user_id = getUserID(email)
+            if user_id != None:
+                login_user(getUserByID(user_id))
+            else:
+                return render_template('show_error.html', error_message="You do not have an account")
+
+        else:
+            return render_template('show_error.html', error_message="You are not a person")
+
+        return redirect(request.url_root)
+
+    else:
+        return render_template('show_login.html')
+
 
 app.wsgi_app = ProxyFix(app.wsgi_app)
 if __name__ == '__main__':
