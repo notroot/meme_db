@@ -3,7 +3,9 @@ from flask import Flask, request, session, g, redirect, url_for, \
 from werkzeug.contrib.fixers import ProxyFix
 import sqlite3
 import os
-
+from string import join
+from random import choice
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -42,6 +44,9 @@ def getPageCount():
 
     return pages
 
+# gets list of images to use for thuumbnail view on main pages
+# returns list with title, img_id and path to thumbnail
+# takes offset and count as optional values
 def getImageThumbs(count=20, offset=0):
 
     db = getDB()
@@ -56,6 +61,7 @@ def getImageThumbs(count=20, offset=0):
 
     return images
 
+# returns info for image from id number
 def getImageByID(imgid):
     db = getDB()
     cur = db.execute("SELECT title, imgid, path, date_added, rating FROM images WHERE imgid=?", (imgid,))
@@ -65,6 +71,7 @@ def getImageByID(imgid):
 
     return img
 
+# returns image info from obfuscated string
 def getObfuscate(key):
     db = getDB()
     cur = db.execute("SELECT i.imgid, i.title, i.path FROM images i, meme m WHERE m.imgid=i.imgid AND m.id=?", (key,))
@@ -74,7 +81,35 @@ def getObfuscate(key):
 
     return img
 
+# generate a six character string to use in obfuscated url_for
+# doesn't yet check to make sure the key isn't already in use
+def genObString():
+    length = 6
+    characters = "abcdefghijklmnoprstuvwyzABCDEFGHIJKLMNOPRSTUVWYZ"
+    string = ''.join(choice(characters) for i in range(length))
 
+    return string
+
+# generates a new URL for an obfuscation of an existing image
+def generatetObURL(img_id):
+    db = getDB()
+
+    cur = db.execute("SELECT imgid FROM images WHERE imgid=?", (img_id,))
+
+    img = cur.fetchone()
+    if img:
+        string = genObString()
+        db.execute("INSERT INTO meme (id, imgid, created) VALUES (?,?,?)", (string, img_id, datetime.now() ))
+        db.commit()
+    else:
+        string = None
+
+    cur.close()
+    return string
+
+###############################################################################
+# Route handing logic
+###############################################################################
 @app.route('/')
 def hello_world():
 
@@ -96,7 +131,7 @@ def hello_world():
     return render_template('show_main.html', thumbs=thumbs, page_count=getPageCount(), p=p)
 
 @app.route('/<var>')
-def parse_ask(var=None):
+def parse_ask(var):
 
     back=request.referrer
 
@@ -113,6 +148,17 @@ def parse_ask(var=None):
             return render_template('show_ob.html', image=img)
         else:
             return render_template('show_error.html', error_message="Obfuscation not found")
+
+@app.route('/gen/<img_id>')
+def parseGen(img_id):
+
+    img = getImageByID(img_id)
+    if img:
+        string = generatetObURL(img_id)
+        new_ob_url = "%s%s" % (request.url_root, string)
+        return redirect(new_ob_url)
+    else:
+        return render_template('show_error.html', error_message="Can't do that sir")
 
 app.wsgi_app = ProxyFix(app.wsgi_app)
 if __name__ == '__main__':
