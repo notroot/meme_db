@@ -1,10 +1,13 @@
 {% extends "layout.html" %}
 
+{% block nav %}
+	{% include "nav_bar.html" with context %}
+{% endblock nav %}
 
 {% block main %}
 
 <!-- Page Content -->
-<div class="container">
+<div class="container vspace">
 
     <div class="row">
 
@@ -21,7 +24,12 @@
           </div>
           {% endif %}
         {% endwith %}
-        </div>
+
+        {% if request.args['q'] -%}
+          <a href="/" class="btn btn-default btn-warning" role="button">
+            <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Clear
+          </a>
+        {%- endif %}
       </div>
 
       {% for group in thumbs|batch(4) -%}

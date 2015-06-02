@@ -9,6 +9,7 @@ from string import join
 from random import choice
 from datetime import datetime
 import md5
+from math import ceil
 
 app = Flask(__name__)
 
@@ -123,25 +124,33 @@ def authenticate_user(email, password_try):
         flash("Cannot find account")
         return None
 
-def getPageCount():
+def getPageCount(query=None):
     db = getDB()
-    cur = db.execute("SELECT count(*) as count FROM images")
+    if query:
+        like_query = "%%%s%%" % query
+        cur = db.execute("SELECT count(*) as count FROM images WHERE title LIKE ?", (like_query,))
+    else:
+        cur = db.execute("SELECT count(*) as count FROM images")
+
     row = cur.fetchone()
     cur.close()
 
-    count = row['count']
+    count = float(row['count'])
 
-    pages = count % 20
+    pages = int(ceil(count/20))
 
     return pages
 
 # gets list of images to use for thuumbnail view on main pages
 # returns list with title, img_id and path to thumbnail
 # takes offset and count as optional values
-def getImageThumbs(count=20, offset=0):
-
+def getImageThumbs(count=20, offset=0, query=None):
     db = getDB()
-    cur = db.execute("SELECT title, imgid, path_thumb FROM images ORDER BY title LIMIT ? OFFSET ?", (count,offset))
+    if query:
+        like_query = "%%%s%%" % query
+        cur = db.execute("SELECT title, imgid, path_thumb FROM images WHERE title LIKE ? ORDER BY title LIMIT ? OFFSET ?", (like_query, count,offset))
+    else:
+        cur = db.execute("SELECT title, imgid, path_thumb FROM images ORDER BY title LIMIT ? OFFSET ?", (count,offset))
 
     rows = cur.fetchall()
     cur.close()
@@ -208,6 +217,10 @@ def hello_world():
     if request.args.get("i"):
         return redirect("/%s" % request.args["i"])
 
+    query = None
+    if request.args.get("q"):
+        query = request.args['q']
+
     if request.args.get("p"):
         p = int(request.args['p'])
         if p > 1:
@@ -215,12 +228,12 @@ def hello_world():
         else:
             offset = 0
 
-        thumbs= getImageThumbs(20, offset)
+        thumbs= getImageThumbs(20, offset, query)
     else:
         p=1
-        thumbs = getImageThumbs()
+        thumbs = getImageThumbs(20, 0, query)
 
-    return render_template('show_main.html', thumbs=thumbs, page_count=getPageCount(), p=p)
+    return render_template('show_main.html', thumbs=thumbs, page_count=getPageCount(query), p=p)
 
 @app.route('/<var>')
 def parse_ask(var):
