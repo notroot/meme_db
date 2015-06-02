@@ -1,12 +1,14 @@
 from flask import Flask, request, session, g, redirect, url_for, \
      abort, render_template, flash, jsonify, json
-from flask.ext.login import LoginManager, UserMixin, login_required, login_user
+from flask.ext.login import LoginManager, UserMixin, login_required, login_user, \
+    logout_user
 from werkzeug.contrib.fixers import ProxyFix
 import sqlite3
 import os
 from string import join
 from random import choice
 from datetime import datetime
+import md5
 
 app = Flask(__name__)
 
@@ -92,6 +94,33 @@ def getUserByID(user_id):
     if row:
         return User(row['user_id'])
     else:
+        return None
+
+def authenticate_user(email, password_try):
+    db = getDB()
+
+    cur = db.execute("SELECT user_id, password, salt FROM users WHERE email=? AND active=1", (email,))
+    row = cur.fetchone()
+    cur.close()
+
+    if row:
+        user_id = row['user_id']
+        password = row['password']
+        salt = row['salt']
+
+        m = md5.new()
+        m.update(password_try)
+        m.update(salt)
+        hashed_try = m.hexdigest()
+
+        if password == hashed_try:
+            return user_id
+        else:
+            flash("Incorrect password")
+            return None
+
+    else:
+        flash("Cannot find account")
         return None
 
 def getPageCount():
@@ -196,21 +225,26 @@ def hello_world():
 @app.route('/<var>')
 def parse_ask(var):
 
+    img = getObfuscate(var)
+    if img:
+        return render_template('show_ob.html', image=img)
+    else:
+        return render_template('show_error.html', error_message="Obfuscation not found")
+
+
+@app.route('/image/<img_id>')
+@login_required
+def show_imageByID(img_id):
     back=request.referrer
 
-    if var.isdigit():
-        img = getImageByID(var)
+    if img_id.isdigit():
+        img = getImageByID(img_id)
         if img:
             return render_template('show_single.html', image=img, back=back)
         else:
             flash('Image not found, dumping you back home')
             return redirect(request.url_root)
-    else:
-        img = getObfuscate(var)
-        if img:
-            return render_template('show_ob.html', image=img)
-        else:
-            return render_template('show_error.html', error_message="Obfuscation not found")
+
 
 @app.route('/gen/<img_id>')
 @login_required
@@ -236,11 +270,9 @@ def show_login():
             password = form.get('password')
 
         if email:
-            user_id = getUserID(email)
-            if user_id != None:
+            user_id = authenticate_user(email, password)
+            if user_id > 0:
                 login_user(getUserByID(user_id))
-            else:
-                return render_template('show_error.html', error_message="You do not have an account")
 
         else:
             return render_template('show_error.html', error_message="You are not a person")
@@ -249,6 +281,12 @@ def show_login():
 
     else:
         return render_template('show_login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect('/login')
 
 
 app.wsgi_app = ProxyFix(app.wsgi_app)
